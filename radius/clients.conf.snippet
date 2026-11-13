@@ -1,0 +1,10 @@
+# Append to /etc/freeradius/3.0/clients.conf.
+# The secret must match the RADIUS secret set on the MikroTik hotspot.
+# Keep the real value out of the repository. Set it on the server only.
+
+client mikrotik-ccr2116 {
+    ipaddr = <ROUTER_MANAGEMENT_IP>
+    secret = <RADIUS_SHARED_SECRET>
+    nas_type = other
+    require_message_authenticator = yes
+}

@@ -1,0 +1,26 @@
+# Section settings for /etc/freeradius/3.0/sites-enabled/default.
+# Start from the stock file and make sure these sections contain the modules listed.
+# Stock names differ slightly between FreeRADIUS releases; keep the stock lines and add
+# what is missing.
+
+authenticate {
+    pap                 # compares User-Password with the Cleartext-Password row
+}
+
+authorize {
+    preprocess
+    sql                 # loads radcheck, including Calling-Station-Id == and Simultaneous-Use
+    pap
+}
+
+session {
+    sql                 # Simultaneous-Use counts open rows in radacct
+}
+
+accounting {
+    sql                 # stores Start, Interim-Update, and Stop, so sessions can be counted
+}
+
+post-auth {
+    sql                 # runs the token-consume query in sql_queries.post-auth.conf
+}
