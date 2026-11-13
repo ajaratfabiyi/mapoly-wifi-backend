@@ -157,9 +157,26 @@ def widen_radius_usernames(engine: Engine) -> None:
                 log.info("widened %s.username", table)
 
 
+def allow_unlimited_devices(engine: Engine) -> None:
+    """Let users.max_devices be NULL, which means no device limit. Idempotent.
+
+    Existing accounts keep their current numbers. This only changes the column, not the rows.
+    SQLite does not enforce NOT NULL on an existing column here, so nothing to do there.
+    """
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ALTER COLUMN max_devices DROP NOT NULL"))
+        log.info("users.max_devices now allows NULL (no limit)")
+    elif engine.dialect.name == "mysql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users MODIFY max_devices INT NULL"))
+        log.info("users.max_devices now allows NULL (no limit)")
+
+
 def run() -> None:
     create_missing_tables(main_engine)
     upgrade_per_device_plans(main_engine)
+    allow_unlimited_devices(main_engine)
     seed_plans(main_engine)
     widen_radius_usernames(radius_engine)
     log.info("database setup complete")

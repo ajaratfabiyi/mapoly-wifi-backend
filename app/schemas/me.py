@@ -26,7 +26,7 @@ class MeResponse(BaseModel):
     access_expires_at: UtcDatetime = None
     days_left: int | None
     auto_renew: bool
-    max_devices: int
+    max_devices: int | None  # null means no limit
     devices: list[DeviceOut]
 
 

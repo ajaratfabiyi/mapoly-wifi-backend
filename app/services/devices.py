@@ -51,7 +51,8 @@ def bind_device(
             existing.ip_address = ip
         return existing
 
-    if count_devices(db, user) >= user.max_devices:
+    # max_devices None means no limit.
+    if user.max_devices is not None and count_devices(db, user) >= user.max_devices:
         raise DeviceLimitReached()
 
     device = UserDevice(

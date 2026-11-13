@@ -28,7 +28,8 @@ class User(Base):
     department: Mapped[str | None] = mapped_column(String(100), nullable=True)
     level: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
-    max_devices: Mapped[int] = mapped_column(Integer, default=2)
+    # Devices this account may bind. None means no limit.
+    max_devices: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
 
     access_type: Mapped[str] = mapped_column(
         Enum("paid", "free", name="access_type"),

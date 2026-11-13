@@ -62,7 +62,7 @@ def register(
             user_type=body.user_type,
             status="pre_registered",
             access_type="paid",
-            max_devices=settings.DEFAULT_MAX_DEVICES,
+            max_devices=settings.DEFAULT_MAX_DEVICES or None,
             auto_renew=True,
             is_active=True,
         )

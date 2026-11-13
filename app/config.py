@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     FRONTEND_ORIGIN: str
     LOGIN_TOKEN_TTL_SECONDS: int = 60
-    DEFAULT_MAX_DEVICES: int = 2
+    DEFAULT_MAX_DEVICES: int = 0  # 0 means no limit on devices per account
 
     # Open accounting sessions with no interim update for this long are closed.
     # MikroTik sends an interim update every 5 minutes, so 15 means three missed.
