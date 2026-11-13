@@ -51,13 +51,16 @@ Paystack and CoA are mocked, so nothing reaches the network.
 
 Render runs the web service and the cron jobs in separate containers. They cannot share
 a SQLite file, so the shared database is Supabase (PostgreSQL). The image is built from `Dockerfile`, and
-`render.yaml` defines three services:
+`render.yaml` defines one service:
 
 | Service | Type | Runs |
 |---|---|---|
 | `mapoly-api` | web | the API. Runs `python -m app.db_setup` before each deploy |
-| `mapoly-expiry` | cron, every minute | `python -m app.jobs.expiry` |
-| `mapoly-cleanup` | cron, every minute | `python -m app.jobs.cleanup` |
+
+There are no cron jobs on Render. Expired plans end when the account is used (login or
+dashboard visit), and unused login tokens expire in RADIUS. The CoA worker runs on the AAA
+VM. `python -m app.jobs.expiry` and `python -m app.jobs.cleanup` still work as optional
+manual runs.
 
 To deploy, in Render choose **New > Blueprint** and select this repository. Render then
 asks for each secret marked `sync: false`:
@@ -80,9 +83,9 @@ so use a paid project for production.
 
 - **SQLite is for local development.** Do not use it on Render: the services would not
   share data, and the free disk is wiped on each deploy.
-- **Login tokens** expire in 60 seconds (`LOGIN_TOKEN_TTL_SECONDS`). Unused tokens are
-  removed by the cleanup job, so until that job runs, FreeRADIUS may accept an unused
-  token.
+- **Login tokens** expire in 60 seconds (`LOGIN_TOKEN_TTL_SECONDS`). Each token carries an
+  `Expiration` in RADIUS, so FreeRADIUS refuses it after that time. This needs the
+  `expiration` module in FreeRADIUS and the AAA VM's clock set to UTC (see `radius/README.md`).
 - **Payment webhook** replies 200 at once and applies the charge in the background. If
   that step fails, Paystack does not retry. The `verify` endpoint is the recovery path.
 - **Dashboard sessions** are signed cookies with no server-side record, so they cannot
@@ -98,6 +101,7 @@ app/
   main.py             FastAPI app, CORS, routers
   config.py           environment settings
   db_engine.py        builds SQLite, PostgreSQL, or MySQL engines
+  services/expiry.py  ends a device's plan when the account is used (login, dashboard)
   db_setup.py         creates and upgrades the database
   database.py         main database session
   radius_database.py  radius database session

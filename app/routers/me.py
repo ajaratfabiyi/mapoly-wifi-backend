@@ -1,3 +1,4 @@
+import redis
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -6,17 +7,28 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import User, UserDevice
+from app.radius_database import get_radius_db
+from app.redis_client import get_redis
 from app.schemas.me import MeResponse, ProfileUpdate
 from app.services.access import any_device_has_access
 from app.services.account import build_me
+from app.services.expiry import expire_user_devices
 from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api", tags=["me"])
 
 
 @router.get("/me", response_model=MeResponse)
-def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> MeResponse:
-    return build_me(db, user, utc_now())
+def get_me(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    radius_db: Session = Depends(get_radius_db),
+    r: redis.Redis = Depends(get_redis),
+) -> MeResponse:
+    now = utc_now()
+    # Ends any expired plan on the account before showing it. This replaces the expiry cron job.
+    expire_user_devices(db, radius_db, r, user, now)
+    return build_me(db, user, now)
 
 
 @router.patch("/me", response_model=MeResponse)

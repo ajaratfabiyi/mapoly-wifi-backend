@@ -28,6 +28,14 @@ GROUP_RESTRICTED = "restricted_users"
 GROUP_UNRESTRICTED = "unrestricted_users"
 
 
+RADIUS_EXPIRATION_FORMAT = "%b %d %Y %H:%M:%S"  # e.g. "Nov 13 2026 13:05:00", as FreeRADIUS reads it
+
+
+def radius_expiration(at: datetime) -> str:
+    """Format a naive UTC time for the RADIUS Expiration attribute."""
+    return at.strftime(RADIUS_EXPIRATION_FORMAT)
+
+
 def group_for(user_type: str) -> str:
     """Gated users are unrestricted. Everyone else is capped (Section 7)."""
     return GROUP_UNRESTRICTED if user_type == "gated" else GROUP_RESTRICTED
@@ -71,6 +79,20 @@ def issue_token(
             "VALUES (:u, 'Cleartext-Password', ':=', :v)"
         ),
         {"u": username, "v": token},
+    )
+    # FreeRADIUS refuses the token itself after its TTL, so an unused token cannot stay
+    # valid until a cleanup job runs. Needs the 'expiration' module in authorize, and the
+    # AAA VM's clock set to UTC (see radius/README.md).
+    radius_db.execute(
+        text("DELETE FROM radcheck WHERE username = :u AND attribute = 'Expiration'"),
+        {"u": username},
+    )
+    radius_db.execute(
+        text(
+            "INSERT INTO radcheck (username, attribute, op, value) "
+            "VALUES (:u, 'Expiration', ':=', :v)"
+        ),
+        {"u": username, "v": radius_expiration(now + timedelta(seconds=ttl_seconds))},
     )
     # The token only works from the device it was issued to.
     radius_db.execute(
@@ -179,7 +201,7 @@ def revoke_user_tokens(db: Session, radius_db: Session, r: redis.Redis, username
         text(
             "DELETE FROM radcheck "
             "WHERE username = :u "
-            "AND attribute IN ('Cleartext-Password', 'Calling-Station-Id')"
+            "AND attribute IN ('Cleartext-Password', 'Calling-Station-Id', 'Expiration')"
         ),
         {"u": username},
     )

@@ -36,6 +36,8 @@ The backend's rows are written in `app/services/login_tokens.py`.
    `ALTER TABLE radcheck ALTER COLUMN username TYPE VARCHAR(255);`
    and the same for `radreply`, `radusergroup`, and `radacct`. (`db_setup` does not do this on PostgreSQL.)
 5. Apply the three files above.
+   Also enable FreeRADIUS's `expiration` module (`ln -s ../mods-available/expiration /etc/freeradius/3.0/mods-enabled/expiration`, and check that `expiration` appears in the `authorize` section of the default site). Login tokens carry an `Expiration` check, so FreeRADIUS refuses them once their 60-second TTL has passed.
+   Set the AAA VM's clock to UTC (`timedatectl set-timezone UTC`). FreeRADIUS reads `Expiration` in its local time, and the backend writes it in UTC.
 6. Validate the configuration: `freeradius -Cx -lstdout`. It must end with `Configuration appears to be OK`.
 7. Restart: `systemctl restart freeradius`.
 8. Set the router to use this server, with the same secret, and enable accounting (router setup, RADIUS and accounting integration).

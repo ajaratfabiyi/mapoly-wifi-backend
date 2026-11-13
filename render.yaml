@@ -2,10 +2,11 @@
 # Every secret is marked sync: false, so Render asks for its value in the dashboard
 # and it never lives in the repository.
 #
-# Three services, one image:
+# One service:
 #   mapoly-api      web service: the FastAPI app. Runs db_setup before each deploy.
-#   mapoly-expiry   cron: ends expired plans, every minute
-#   mapoly-cleanup  cron: removes expired login tokens and old audit rows, every minute
+#
+# There are no cron jobs. Expired plans are ended on login and dashboard visits, and
+# unused login tokens expire in RADIUS itself. The CoA worker runs on the AAA VM.
 #
 # The database is Supabase (PostgreSQL). SQLite is for local development only, because
 # these services run in separate containers and cannot share a SQLite file.
@@ -46,47 +47,3 @@ services:
         sync: false
       - key: RADIUS_COA_SECRET
         sync: false
-
-  - type: cron
-    name: mapoly-expiry
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    schedule: "* * * * *"
-    dockerCommand: python -m app.jobs.expiry
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: RADIUS_DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: SECRET_KEY
-        sync: false
-      - key: PAYSTACK_SECRET_KEY
-        sync: false
-      - key: FRONTEND_ORIGIN
-        value: https://mapolywifi.vercel.app
-      - key: COA_NAS_HOST
-        sync: false
-      - key: RADIUS_COA_SECRET
-        sync: false
-
-  - type: cron
-    name: mapoly-cleanup
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    schedule: "* * * * *"
-    dockerCommand: python -m app.jobs.cleanup
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: RADIUS_DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: SECRET_KEY
-        sync: false
-      - key: PAYSTACK_SECRET_KEY
-        sync: false
-      - key: FRONTEND_ORIGIN
-        value: https://mapolywifi.vercel.app
