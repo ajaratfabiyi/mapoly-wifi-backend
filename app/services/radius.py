@@ -66,3 +66,24 @@ def remove_device_access(radius_db: Session, mac: str) -> None:
             {"p": "%" + DEVICE_SEPARATOR + to_radius_format(mac)},
         )
     radius_db.commit()
+
+
+CLOSE_ON_LOGIN_CAUSE = "Lost-Service"
+
+
+def close_device_sessions(radius_db: Session, mac: str, now) -> int:
+    """Close this device's open radacct sessions before a new login.
+
+    A device can have only one session. If the router missed the stop message for an
+    earlier session, that record would block the new login. A new login means the old
+    session is over, so close it now. Returns the number of rows closed.
+    """
+    result = radius_db.execute(
+        text(
+            "UPDATE radacct SET acctstoptime = :now, acctterminatecause = :cause "
+            "WHERE callingstationid = :m AND acctstoptime IS NULL"
+        ),
+        {"now": now, "cause": CLOSE_ON_LOGIN_CAUSE, "m": to_radius_format(mac)},
+    )
+    radius_db.commit()
+    return result.rowcount or 0

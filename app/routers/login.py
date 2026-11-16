@@ -17,6 +17,7 @@ from app.services.audit import log_event
 from app.services.device_cache import cache_device_added
 from app.services.devices import DeviceLimitReached, DeviceOwnedByAnotherUser, bind_device
 from app.services.expiry import expire_user_devices
+from app.services.radius import close_device_sessions
 from app.services.login_tokens import find_reusable_token, issue_token
 from app.services.radius import device_username
 from app.utils.client_ip import client_ip
@@ -106,6 +107,9 @@ def login(
     # End any expired plan on this account before deciding access. This replaces the
     # expiry cron job. A failure is logged and retried on the next visit.
     expire_user_devices(db, radius_db, r, user, now)
+
+    # A new login ends any stuck session on this device, so the router accepts the new one.
+    close_device_sessions(radius_db, mac, now)
 
     # The RADIUS username names this device, so each device has its own token.
     radius_user = device_username(email, mac)
