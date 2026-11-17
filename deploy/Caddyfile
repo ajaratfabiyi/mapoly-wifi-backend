@@ -1,0 +1,12 @@
+# Caddy reverse proxy for the MAPOLY API on the AAA VM.
+# Replace api.example.edu.ng with the domain pointed at the campus public IP.
+# Caddy obtains and renews the HTTPS certificate automatically. Ports 80 and 443
+# must reach this VM (router port forwarding).
+
+api.example.edu.ng {
+	encode gzip
+
+	reverse_proxy 127.0.0.1:8000 {
+		header_up X-Forwarded-For {remote_host}
+	}
+}

@@ -31,9 +31,9 @@ Health check: `GET /api/health`.
 plans, and seeds the four storefront plans. It is safe to run repeatedly. Run it once
 for a new database and again after any deploy that changes the schema.
 
-On SQLite and PostgreSQL everything works. On MySQL, the setup also widens the FreeRADIUS
-username columns. PostgreSQL enforces VARCHAR length too, so those columns must be widened
-by hand once (see `radius/README.md`, step 4).
+SQLite and PostgreSQL are both fully supported. The FreeRADIUS username columns are
+VARCHAR(255) on PostgreSQL, so they must be widened by hand once (see `radius/README.md`,
+step 4). `db_setup` does not do this.
 
 ## Tests
 
@@ -47,11 +47,27 @@ it.
 
 Paystack and CoA are mocked, so nothing reaches the network.
 
+## Deployment on the AAA VM (recommended)
+
+The API runs on the AAA VM (10.10.10.123) behind Caddy, which terminates HTTPS. Files are in
+`deploy/`:
+
+- `deploy/mapoly-api.service`: systemd unit. Runs uvicorn on `127.0.0.1:8000`, so only Caddy
+  can reach it.
+- `deploy/Caddyfile`: Caddy reverse proxy and automatic HTTPS for the API domain.
+
+Set `TRUST_PROXY_HEADERS=true` in `/opt/mapoly/.env` on the VM. Caddy is the only thing that
+reaches uvicorn, so the rightmost `X-Forwarded-For` entry is the real client address.
+
+Steps are in `radius/README.md` (FreeRADIUS and the CoA worker) and `deploy/README.md`
+(the API). The router must forward ports 80 and 443 to the VM for certificate issuance and
+HTTPS.
+
 ## Deployment on Render (Docker, Supabase)
 
-Render runs the web service and the cron jobs in separate containers. They cannot share
-a SQLite file, so the shared database is Supabase (PostgreSQL). The image is built from `Dockerfile`, and
-`render.yaml` defines one service:
+Render is a fallback. The image is built from `Dockerfile`, and `render.yaml` defines one
+service. Render runs only the web service. Its database is Supabase (PostgreSQL) because a
+web container cannot share a SQLite file with the VM:
 
 | Service | Type | Runs |
 |---|---|---|
@@ -71,9 +87,9 @@ asks for each secret marked `sync: false`:
 - `SECRET_KEY`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY`
 - `COA_NAS_HOST`, `RADIUS_COA_SECRET`
 
-Render must be able to reach the MySQL and Redis servers. The CoA disconnect also needs
-to reach the MikroTik over UDP 3799, which sits on the campus network. Until the expiry
-job can reach the router, expired sessions continue until the user reconnects.
+Render must be able to reach the Supabase database and Redis. Render cannot send CoA
+disconnects to the MikroTik (UDP 3799 is on the campus network), so the CoA worker on the AAA
+VM must be running for disconnects to work.
 
 Take a Supabase backup (or confirm point-in-time recovery is on) before the first deploy
 that runs `db_setup` against production. Supabase free projects pause after inactivity,

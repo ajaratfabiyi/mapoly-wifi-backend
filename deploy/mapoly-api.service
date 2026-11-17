@@ -1,0 +1,26 @@
+[Unit]
+Description=MAPOLY WiFi API (FastAPI)
+After=network-online.target redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mapoly
+Group=mapoly
+WorkingDirectory=/opt/mapoly
+EnvironmentFile=/opt/mapoly/.env
+# Creates or upgrades tables before the API starts. Safe to repeat.
+ExecStartPre=/opt/mapoly/.venv/bin/python -m app.db_setup
+# Listens on localhost only. Caddy is the only thing that reaches it.
+ExecStart=/opt/mapoly/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
