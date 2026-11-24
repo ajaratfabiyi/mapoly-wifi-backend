@@ -25,6 +25,8 @@ def list_plans(db: Session = Depends(get_db)) -> list[PlanOut]:
             price_naira=p.price_kobo // 100,
             speed_limit_mbps=p.speed_limit_mbps,
             popular=p.id == POPULAR_PLAN_ID,
+            points_award=p.points_award,
+            points_cost=p.points_cost,
         )
         for p in plans
     ]

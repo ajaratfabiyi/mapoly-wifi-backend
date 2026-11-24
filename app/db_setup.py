@@ -15,8 +15,10 @@ What it does:
      current plan onto its existing devices (so no one loses access);
    - removes the old account-level plan columns from users;
    - updates the coa_queue reason list (PostgreSQL and MySQL; SQLite stores it as plain text).
-3. Seeds the four storefront plans (updates prices and titles if they changed).
-4. Widens the RADIUS username columns to VARCHAR(255), in the radius database, if the
+3. Adds the points columns (users.points, plans.points_award, plans.points_cost).
+4. Seeds the storefront plans (updates prices, titles and points if they changed) and turns
+   off the plans that were retired (plan_biweekly).
+5. Widens the RADIUS username columns to VARCHAR(255), in the radius database, if the
    tables exist (MySQL only; SQLite and PostgreSQL do not need it here). Device usernames
    are the email plus 18 characters, which overflows FreeRADIUS's default VARCHAR(64) on
    MySQL. On PostgreSQL, widen the columns by hand (see radius/README.md).
@@ -44,12 +46,17 @@ log = logging.getLogger(__name__)
 COA_REASON_VALUES = ("plan_expired", "device_removed", "device_plan_expired", "account_disabled")
 COA_REASONS = ",".join(f"'{r}'" for r in COA_REASON_VALUES)
 
+# (id, title, duration hours, price in kobo, speed Mbps, points earned, points to buy)
+# Points: 1 point = ₦1 when spent, so points_cost equals the price in naira.
 PLANS = [
-    ("plan_2days", "2-Day Campus Pass", 48, 40000, 25),
-    ("plan_weekly", "Weekly Academic Pass", 168, 120000, 35),
-    ("plan_biweekly", "Bi-Weekly Scholar Pass", 336, 220000, None),
-    ("plan_monthly", "Monthly Semester Pro", 720, 400000, None),
+    ("plan_1day", "1-Day Pass", 24, 30000, None, 5, 300),
+    ("plan_2days", "2-Day Campus Pass", 48, 50000, 25, 10, 500),
+    ("plan_weekly", "Weekly Academic Pass", 168, 200000, 35, 20, 2000),
+    ("plan_monthly", "Monthly Semester Pro", 720, 500000, None, 50, 5000),
 ]
+
+# Plans that are no longer sold. They stay in the table so old ledger rows still resolve.
+RETIRED_PLAN_IDS = ("plan_biweekly",)
 
 RADIUS_USERNAME_TABLES = ("radcheck", "radreply", "radusergroup", "radacct")
 
@@ -122,18 +129,43 @@ def upgrade_per_device_plans(engine: Engine) -> None:
         log.info("skipped coa_queue enum update (SQLite stores the reason as plain text)")
 
 
+def upgrade_points_schema(engine: Engine) -> None:
+    """Add the points columns to an existing database. Idempotent.
+
+    Plain ADD COLUMN with a default works on SQLite, PostgreSQL and MySQL alike.
+    """
+    with engine.begin() as conn:
+        if not column_exists(engine, "users", "points"):
+            conn.execute(text("ALTER TABLE users ADD COLUMN points INTEGER NOT NULL DEFAULT 0"))
+            log.info("added users.points")
+        if not column_exists(engine, "plans", "points_award"):
+            conn.execute(text("ALTER TABLE plans ADD COLUMN points_award INTEGER NOT NULL DEFAULT 0"))
+            log.info("added plans.points_award")
+        if not column_exists(engine, "plans", "points_cost"):
+            conn.execute(text("ALTER TABLE plans ADD COLUMN points_cost INTEGER NULL"))
+            log.info("added plans.points_cost")
+
+
 def seed_plans(engine: Engine) -> None:
-    """Insert or update the four storefront plans. Uses the ORM, so it works on both databases."""
+    """Insert or update the storefront plans and retire the old ones. Uses the ORM,
+    so it works on every database."""
     with Session(engine) as session:
-        for plan_id, title, hours, price, speed in PLANS:
+        for plan_id, title, hours, price, speed, award, cost in PLANS:
             plan = session.get(Plan, plan_id)
             if plan is None:
-                plan = Plan(id=plan_id, is_active=True)
+                plan = Plan(id=plan_id)
                 session.add(plan)
             plan.title = title
             plan.duration_hours = hours
             plan.price_kobo = price
             plan.speed_limit_mbps = speed
+            plan.points_award = award
+            plan.points_cost = cost
+            plan.is_active = True
+        for plan_id in RETIRED_PLAN_IDS:
+            plan = session.get(Plan, plan_id)
+            if plan is not None:
+                plan.is_active = False
         session.commit()
     log.info("plans seeded")
 
@@ -176,6 +208,7 @@ def allow_unlimited_devices(engine: Engine) -> None:
 def run() -> None:
     create_missing_tables(main_engine)
     upgrade_per_device_plans(main_engine)
+    upgrade_points_schema(main_engine)
     allow_unlimited_devices(main_engine)
     seed_plans(main_engine)
     widen_radius_usernames(radius_engine)

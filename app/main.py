@@ -11,6 +11,7 @@ from app.routers.me import router as me_router
 from app.routers.payments import router as payments_router
 from app.routers.router_access import router as router_access_router
 from app.routers.plans import router as plans_router
+from app.routers.points import router as points_router
 from app.routers.webhook import router as webhook_router
 
 settings = get_settings()
@@ -55,6 +56,7 @@ for router in (
     plans_router,
     payments_router,
     router_access_router,
+    points_router,
     webhook_router,
 ):
     app.include_router(router)

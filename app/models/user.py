@@ -39,6 +39,9 @@ class User(Base):
     auto_renew: Mapped[bool] = mapped_column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # Points balance. 1 point = ₦1 when spent. Every change is also written to points_entries.
+    points: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )

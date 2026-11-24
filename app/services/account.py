@@ -88,5 +88,6 @@ def build_me(db: Session, user: User, now: datetime) -> MeResponse:
         days_left=days_left(expires, now),
         auto_renew=user.auto_renew,
         max_devices=user.max_devices,
+        points=user.points or 0,
         devices=[device_out(d, user, device_plan(db, d), now) for d in devices],
     )

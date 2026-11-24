@@ -17,3 +17,7 @@ class Plan(Base):
     # Nullable until the speed question in Section 11 is settled.
     speed_limit_mbps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Points the buyer earns when this plan is paid for with cash.
+    points_award: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Points needed to buy this plan with points (1 point = ₦1). None means points cannot buy it.
+    points_cost: Mapped[int | None] = mapped_column(Integer, nullable=True)

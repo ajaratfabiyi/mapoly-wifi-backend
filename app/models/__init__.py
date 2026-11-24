@@ -6,7 +6,11 @@ from app.models.device import UserDevice
 from app.models.ledger import Ledger
 from app.models.login_token import LoginToken
 from app.models.plan import Plan
+from app.models.points_entry import PointsEntry
 from app.models.session_log import SessionLog
 from app.models.user import User
 
-__all__ = ["Base", "User", "UserDevice", "Plan", "Ledger", "SessionLog", "LoginToken", "CoaQueue"]
+__all__ = [
+    "Base", "User", "UserDevice", "Plan", "Ledger", "PointsEntry",
+    "SessionLog", "LoginToken", "CoaQueue",
+]

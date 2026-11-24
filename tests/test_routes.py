@@ -43,9 +43,9 @@ def clean_state():
     db.add_all(
         [
             Plan(id="plan_2days", title="2-Day Campus Pass", duration_hours=48,
-                 price_kobo=40000, speed_limit_mbps=25, is_active=True),
+                 price_kobo=50000, speed_limit_mbps=25, is_active=True),
             Plan(id="plan_weekly", title="Weekly Academic Pass", duration_hours=168,
-                 price_kobo=120000, speed_limit_mbps=35, is_active=True),
+                 price_kobo=200000, speed_limit_mbps=35, is_active=True),
         ]
     )
     db.commit()
@@ -338,7 +338,7 @@ def test_plans_are_public_and_mark_the_popular_one(make_client):
     assert resp.status_code == 200
     plans = {p["id"]: p for p in resp.json()}
     assert plans["plan_weekly"]["popular"] is True
-    assert plans["plan_weekly"]["price_naira"] == 1200
+    assert plans["plan_weekly"]["price_naira"] == 2000
     assert plans["plan_2days"]["popular"] is False
 
 
@@ -361,7 +361,7 @@ def test_initialize_creates_pending_ledger_and_returns_checkout(make_client, mon
 
     def fake_initialize(email, amount_kobo, reference, callback_url=None):
         assert email == "student@mapoly.edu.ng"
-        assert amount_kobo == 120000
+        assert amount_kobo == 200000
         return {"reference": reference, "authorization_url": "https://checkout.example/x",
                 "access_code": "abc123"}
 
@@ -401,7 +401,7 @@ def test_verify_applies_success_once_and_rejects_wrong_amount(make_client, monke
 
     def fake_verify(reference):
         if reference == "ref_ok":
-            return {"status": "success", "amount": 120000,
+            return {"status": "success", "amount": 200000,
                     "paid_at": "2026-11-12T12:00:00.000Z"}
         return {"status": "success", "amount": 100, "paid_at": "2026-11-12T12:00:00.000Z"}
 
@@ -457,7 +457,7 @@ def test_webhook_applies_charge_and_is_idempotent(make_client):
 
     payload = {
         "event": "charge.success",
-        "data": {"reference": "ref_hook", "amount": 120000,
+        "data": {"reference": "ref_hook", "amount": 200000,
                  "paid_at": "2026-11-12T12:00:00.000Z"},
     }
     raw, sig = _signed(payload)

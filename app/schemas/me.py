@@ -27,6 +27,7 @@ class MeResponse(BaseModel):
     days_left: int | None
     auto_renew: bool
     max_devices: int | None  # null means no limit
+    points: int  # points balance, 1 point = ₦1 when spent
     devices: list[DeviceOut]
 
 

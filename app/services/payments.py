@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models import Ledger, Plan, UserDevice
 from app.services.access import extend_device_access
 from app.services.login_tokens import group_for
+from app.services.points import award_purchase_points
 from app.services.radius import device_username, grant_mac_access
 
 log = logging.getLogger(__name__)
@@ -69,6 +70,8 @@ def apply_successful_charge(
     ledger.status = "success"
     ledger.paid_at = paid_at
     extend_device_access(device, plan.duration_hours, now)
+    # Same transaction as the status change, so points are credited exactly once.
+    award_purchase_points(db, reference, plan, now)
     db.commit()
     return APPLIED
 

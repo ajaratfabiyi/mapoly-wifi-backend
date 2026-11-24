@@ -108,7 +108,7 @@ def test_charge_extends_only_the_device_it_paid_for(client):
             user_id=user.id,
             device_id=laptop_device.id,
             plan_id="plan_weekly",
-            amount_kobo=120000,
+            amount_kobo=200000,
             status="pending",
             created_at=now,
         )
@@ -117,7 +117,7 @@ def test_charge_extends_only_the_device_it_paid_for(client):
     db.close()
 
     db = SessionLocal()
-    result = apply_successful_charge(db, "ref_laptop", 120000, now, now)
+    result = apply_successful_charge(db, "ref_laptop", 200000, now, now)
     db.close()
     assert result == APPLIED
 

@@ -8,3 +8,5 @@ class PlanOut(BaseModel):
     price_naira: int
     speed_limit_mbps: int | None
     popular: bool
+    points_award: int  # points earned when this plan is bought with cash
+    points_cost: int | None  # points that buy it; null means points cannot buy it
