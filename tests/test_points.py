@@ -116,10 +116,10 @@ def test_cash_purchase_of_weekly_plan_earns_20_points():
     assert apply_successful_charge(db, "ref_buy", 200000, now, now) == APPLIED
     db.close()
 
-    assert points_of() == 20
+    assert points_of() == 200
     db = SessionLocal()
     entry = db.scalar(select(PointsEntry).where(PointsEntry.reference == "ref_buy"))
-    assert (entry.delta, entry.balance_after, entry.reason) == (20, 20, "purchase")
+    assert (entry.delta, entry.balance_after, entry.reason) == (200, 200, "purchase")
     db.close()
 
 
@@ -136,7 +136,7 @@ def test_repeated_charge_does_not_award_points_twice():
     assert apply_successful_charge(db, "ref_twice", 30000, now, now) == ALREADY_APPLIED
     db.close()
 
-    assert points_of() == 5
+    assert points_of() == 50
 
 
 # ---------- spending ----------
@@ -240,7 +240,7 @@ def test_plans_show_points_earned_and_price_in_points():
     plans = {p["id"]: p for p in resp.json()}
     assert "plan_biweekly" not in plans
     assert plans["plan_1day"]["price_naira"] == 300
-    assert plans["plan_1day"]["points_award"] == 5
+    assert plans["plan_1day"]["points_award"] == 50
     assert plans["plan_1day"]["points_cost"] == 300
-    assert plans["plan_monthly"]["points_award"] == 50
+    assert plans["plan_monthly"]["points_award"] == 500
     assert plans["plan_monthly"]["points_cost"] == 5000

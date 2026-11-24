@@ -49,10 +49,10 @@ COA_REASONS = ",".join(f"'{r}'" for r in COA_REASON_VALUES)
 # (id, title, duration hours, price in kobo, speed Mbps, points earned, points to buy)
 # Points: 1 point = ₦1 when spent, so points_cost equals the price in naira.
 PLANS = [
-    ("plan_1day", "1-Day Pass", 24, 30000, None, 5, 300),
-    ("plan_2days", "2-Day Campus Pass", 48, 50000, 25, 10, 500),
-    ("plan_weekly", "Weekly Academic Pass", 168, 200000, 35, 20, 2000),
-    ("plan_monthly", "Monthly Semester Pro", 720, 500000, None, 50, 5000),
+    ("plan_1day", "1-Day Pass", 24, 30000, None, 50, 300),
+    ("plan_2days", "2-Day Campus Pass", 48, 50000, 25, 100, 500),
+    ("plan_weekly", "Weekly Academic Pass", 168, 200000, 35, 200, 2000),
+    ("plan_monthly", "Monthly Semester Pro", 720, 500000, None, 500, 5000),
 ]
 
 # Plans that are no longer sold. They stay in the table so old ledger rows still resolve.

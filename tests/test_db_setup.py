@@ -23,10 +23,10 @@ def test_radius_username_tables_listed():
 def test_points_prices_match_the_price_list():
     """₦ price, earned points and points price for each plan, as agreed."""
     by_id = {p[0]: p for p in PLANS}
-    assert by_id["plan_1day"][3:] == (30000, None, 5, 300)
-    assert by_id["plan_2days"][3:] == (50000, 25, 10, 500)
-    assert by_id["plan_weekly"][3:] == (200000, 35, 20, 2000)
-    assert by_id["plan_monthly"][3:] == (500000, None, 50, 5000)
+    assert by_id["plan_1day"][3:] == (30000, None, 50, 300)
+    assert by_id["plan_2days"][3:] == (50000, 25, 100, 500)
+    assert by_id["plan_weekly"][3:] == (200000, 35, 200, 2000)
+    assert by_id["plan_monthly"][3:] == (500000, None, 500, 5000)
     # Points cost equals the naira price, since 1 point = ₦1.
     assert all(p[6] == p[3] // 100 for p in PLANS)
 
