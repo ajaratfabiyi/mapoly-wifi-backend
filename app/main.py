@@ -9,6 +9,7 @@ from app.routers.devices import router as devices_router
 from app.routers.login import router as login_router
 from app.routers.me import router as me_router
 from app.routers.payments import router as payments_router
+from app.routers.router_access import router as router_access_router
 from app.routers.plans import router as plans_router
 from app.routers.webhook import router as webhook_router
 
@@ -53,6 +54,7 @@ for router in (
     devices_router,
     plans_router,
     payments_router,
+    router_access_router,
     webhook_router,
 ):
     app.include_router(router)

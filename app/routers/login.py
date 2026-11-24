@@ -17,8 +17,8 @@ from app.services.audit import log_event
 from app.services.device_cache import cache_device_added
 from app.services.devices import DeviceLimitReached, DeviceOwnedByAnotherUser, bind_device
 from app.services.expiry import expire_user_devices
-from app.services.radius import close_device_sessions
-from app.services.login_tokens import find_reusable_token, issue_token
+from app.services.radius import close_device_sessions, grant_mac_access
+from app.services.login_tokens import find_reusable_token, group_for, issue_token
 from app.services.radius import device_username
 from app.utils.client_ip import client_ip
 from app.utils.mac import InvalidMacError, normalise_mac
@@ -143,6 +143,12 @@ def login(
                     ttl_seconds=settings.LOGIN_TOKEN_TTL_SECONDS,
                 )
                 expires_in = settings.LOGIN_TOKEN_TTL_SECONDS
+            # Paid devices also get MAC-based access, so they reconnect without logging in.
+            # This covers devices that paid before that was added.
+            if user.access_type == "paid" and device.access_expires_at is not None:
+                grant_mac_access(
+                    radius_db, mac, device.access_expires_at, group_for(user.user_type), now
+                )
         except (SQLAlchemyError, redis.RedisError):
             raise HTTPException(status_code=503, detail=UNAVAILABLE)
 

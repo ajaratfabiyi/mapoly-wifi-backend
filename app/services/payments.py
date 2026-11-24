@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Ledger, Plan, UserDevice
 from app.services.access import extend_device_access
-from app.services.radius import device_username
+from app.services.login_tokens import group_for
+from app.services.radius import device_username, grant_mac_access
 
 log = logging.getLogger(__name__)
 
@@ -70,6 +71,27 @@ def apply_successful_charge(
     extend_device_access(device, plan.duration_hours, now)
     db.commit()
     return APPLIED
+
+
+def grant_mac_for_charge(db: Session, radius_db: Session, reference: str, now: datetime) -> None:
+    """Let the paid device onto the network by MAC, so it reconnects without logging in.
+
+    Safe to call again for the same charge: it replaces the device's rows with the
+    current expiry. Call it after apply_successful_charge returns APPLIED or ALREADY_APPLIED.
+    """
+    ledger = db.scalar(select(Ledger).where(Ledger.reference == reference))
+    if ledger is None or ledger.device_id is None or ledger.status != "success":
+        return
+    device = db.get(UserDevice, ledger.device_id)
+    if device is None or device.access_expires_at is None:
+        return
+    grant_mac_access(
+        radius_db,
+        device.mac_address,
+        device.access_expires_at,
+        group_for(device.user.user_type),
+        now,
+    )
 
 
 def cache_status(r: redis.Redis, username: str, expires_at: datetime, now: datetime) -> None:

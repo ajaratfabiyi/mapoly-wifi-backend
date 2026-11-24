@@ -26,10 +26,11 @@ def _run_issue(mac: str):
     return token, calls
 
 
-def test_token_row_bound_to_device_mac_in_radius_format():
+def test_token_row_bound_to_device_mac_in_router_format():
+    # The router sends Calling-Station-Id with colons (confirmed by tcpdump).
     _, calls = _run_issue("a4:c3:f0:88:91:2e")
     mac_rows = [params for sql, params in calls if "Calling-Station-Id" in sql and "INSERT" in sql]
-    assert mac_rows == [{"u": "a@mapoly.edu.ng", "m": "A4-C3-F0-88-91-2E"}]
+    assert mac_rows == [{"u": "a@mapoly.edu.ng", "m": "A4:C3:F0:88:91:2E"}]
 
 
 def test_simultaneous_use_replaced_not_duplicated():

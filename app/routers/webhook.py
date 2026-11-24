@@ -3,8 +3,15 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from app.database import SessionLocal
+from app.radius_database import RadiusSessionLocal
 from app.redis_client import get_redis
-from app.services.payments import APPLIED, apply_successful_charge, cache_charge_status
+from app.services.payments import (
+    ALREADY_APPLIED,
+    APPLIED,
+    apply_successful_charge,
+    cache_charge_status,
+    grant_mac_for_charge,
+)
 from app.services.paystack import verify_webhook_signature
 from app.utils.paystack_time import parse_paystack_time
 from app.utils.time import utc_now
@@ -47,10 +54,17 @@ def process_charge(data: dict) -> None:
         result = apply_successful_charge(
             db,
             reference,
-            int(data.get("amount", -1)),
+            # requested_amount is the plan price; amount includes the Paystack fee.
+            int(data.get("requested_amount") or data.get("amount", -1)),
             parse_paystack_time(data.get("paid_at"), now),
             now,
         )
+        if result in (APPLIED, ALREADY_APPLIED):
+            radius_db = RadiusSessionLocal()
+            try:
+                grant_mac_for_charge(db, radius_db, reference, now)
+            finally:
+                radius_db.close()
         if result == APPLIED:
             cache_charge_status(get_redis(), db, reference, now)
     except Exception:

@@ -22,7 +22,7 @@ from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
 from app.models import LoginToken
-from app.utils.mac import to_radius_format
+from app.utils.mac import normalise_mac, to_radius_format
 
 GROUP_RESTRICTED = "restricted_users"
 GROUP_UNRESTRICTED = "unrestricted_users"
@@ -100,7 +100,8 @@ def issue_token(
             "INSERT INTO radcheck (username, attribute, op, value) "
             "VALUES (:u, 'Calling-Station-Id', '==', :m)"
         ),
-        {"u": username, "m": to_radius_format(mac)},
+        # Calling-Station-Id is sent by the router with colons (AA:BB:...), not dashes.
+        {"u": username, "m": normalise_mac(mac)},
     )
     # One active session per account. Replace the row so it is never duplicated.
     radius_db.execute(

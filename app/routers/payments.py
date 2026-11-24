@@ -7,10 +7,16 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.radius_database import get_radius_db
 from app.models import Ledger, Plan, User, UserDevice
 from app.redis_client import get_redis
 from app.schemas.payments import InitializeRequest, InitializeResponse, VerifyResponse
-from app.services.payments import AMOUNT_MISMATCH, apply_successful_charge, cache_charge_status
+from app.services.payments import (
+    AMOUNT_MISMATCH,
+    apply_successful_charge,
+    cache_charge_status,
+    grant_mac_for_charge,
+)
 from app.services.paystack import PaystackError, initialize_transaction, verify_transaction
 from app.utils.paystack_time import parse_paystack_time
 from app.utils.time import utc_now
@@ -85,6 +91,7 @@ def verify_payment(
     reference: str,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    radius_db: Session = Depends(get_radius_db),
     r: redis.Redis = Depends(get_redis),
 ) -> VerifyResponse:
     """Fallback for when the webhook has not arrived. Asks Paystack directly.
@@ -105,7 +112,9 @@ def verify_payment(
             result = apply_successful_charge(
                 db,
                 reference,
-                int(data.get("amount", -1)),
+                # requested_amount is the plan price; amount includes the Paystack fee
+                # the customer paid, so comparing amount would reject every charge.
+                int(data.get("requested_amount") or data.get("amount", -1)),
                 parse_paystack_time(data.get("paid_at"), now),
                 now,
             )
@@ -118,6 +127,7 @@ def verify_payment(
     db.refresh(ledger)
 
     if ledger.status == "success":
+        grant_mac_for_charge(db, radius_db, reference, now)
         cache_charge_status(r, db, reference, now)
         device = db.get(UserDevice, ledger.device_id) if ledger.device_id is not None else None
         return VerifyResponse(

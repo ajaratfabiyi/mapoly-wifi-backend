@@ -7,10 +7,13 @@ FreeRADIUS reads the radius database. The backend only writes to it here, for:
 Radacct is written by FreeRADIUS and is never touched here.
 """
 
+from datetime import datetime
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.utils.mac import to_radius_format
+from app.services.login_tokens import radius_expiration
+from app.utils.mac import normalise_mac, to_radius_format
 
 USER_TABLES = ("radcheck", "radreply", "radusergroup")
 
@@ -51,20 +54,75 @@ def remove_user_access(radius_db: Session, email: str) -> None:
 def remove_device_access(radius_db: Session, mac: str) -> None:
     """Delete every row for this device: its MAC rows and its per-device username rows.
 
-    Stored in RADIUS format (AA-BB-…), which is what the router sends.
+    Calling-Station-Id uses the router's colon format (AA:BB:...). Usernames use dashes.
     """
     radius_db.execute(
         text(
             "DELETE FROM radcheck "
             "WHERE attribute = 'Calling-Station-Id' AND value = :m"
         ),
-        {"m": to_radius_format(mac)},
+        {"m": normalise_mac(mac)},
     )
     for table in USER_TABLES:
         radius_db.execute(
             text(f"DELETE FROM {table} WHERE username LIKE :p"),
             {"p": "%" + DEVICE_SEPARATOR + to_radius_format(mac)},
         )
+    # The MAC-login row (see grant_mac_access) is keyed by the MAC itself.
+    for table in USER_TABLES:
+        radius_db.execute(
+            text(f"DELETE FROM {table} WHERE username = :m"),
+            {"m": normalise_mac(mac)},
+        )
+    radius_db.commit()
+
+
+def grant_mac_access(
+    radius_db: Session,
+    mac: str,
+    expires_at: datetime,
+    group: str,
+    now: datetime,
+) -> None:
+    """Let this device onto the network without a login until expires_at.
+
+    The router sends the device's MAC as the username (radius-mac-format XX:XX:...).
+    Auth-Type := Accept lets FreeRADIUS accept it without a password, and the
+    Expiration row ends access when the plan ends. Re-running this replaces the rows,
+    so a renewal simply moves the expiry on.
+    """
+    username = normalise_mac(mac)
+    seconds = max(1, int((expires_at - now).total_seconds()))
+    for table in USER_TABLES:
+        radius_db.execute(text(f"DELETE FROM {table} WHERE username = :u"), {"u": username})
+    radius_db.execute(
+        text(
+            "INSERT INTO radcheck (username, attribute, op, value) "
+            "VALUES (:u, 'Auth-Type', ':=', 'Accept')"
+        ),
+        {"u": username},
+    )
+    radius_db.execute(
+        text(
+            "INSERT INTO radcheck (username, attribute, op, value) "
+            "VALUES (:u, 'Expiration', ':=', :v)"
+        ),
+        {"u": username, "v": radius_expiration(expires_at)},
+    )
+    radius_db.execute(
+        text(
+            "INSERT INTO radreply (username, attribute, op, value) "
+            "VALUES (:u, 'Session-Timeout', ':=', :v)"
+        ),
+        {"u": username, "v": str(seconds)},
+    )
+    radius_db.execute(
+        text(
+            "INSERT INTO radusergroup (username, groupname, priority) "
+            "VALUES (:u, :g, 1)"
+        ),
+        {"u": username, "g": group},
+    )
     radius_db.commit()
 
 
@@ -83,7 +141,7 @@ def close_device_sessions(radius_db: Session, mac: str, now) -> int:
             "UPDATE radacct SET acctstoptime = :now, acctterminatecause = :cause "
             "WHERE callingstationid = :m AND acctstoptime IS NULL"
         ),
-        {"now": now, "cause": CLOSE_ON_LOGIN_CAUSE, "m": to_radius_format(mac)},
+        {"now": now, "cause": CLOSE_ON_LOGIN_CAUSE, "m": normalise_mac(mac)},
     )
     radius_db.commit()
     return result.rowcount or 0

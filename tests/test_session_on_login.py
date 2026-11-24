@@ -47,7 +47,7 @@ def test_login_closes_stuck_session_on_same_device():
     with radius_engine.begin() as conn:
         conn.execute(text(
             "INSERT INTO radacct (username, callingstationid, acctstoptime) "
-            "VALUES ('x', 'A4-C3-F0-88-91-30', NULL)"))
+            "VALUES ('x', 'A4:C3:F0:88:91:30', NULL)"))
 
     resp = TestClient(app).post("/api/login", json={
         "email": EMAIL, "password": PASSWORD, "mac": MAC, "ip": "10.30.1.25"})
@@ -55,6 +55,6 @@ def test_login_closes_stuck_session_on_same_device():
 
     with radius_engine.connect() as conn:
         open_rows = conn.execute(text(
-            "SELECT COUNT(*) FROM radacct WHERE callingstationid = 'A4-C3-F0-88-91-30' "
+            "SELECT COUNT(*) FROM radacct WHERE callingstationid = 'A4:C3:F0:88:91:30' "
             "AND acctstoptime IS NULL")).scalar()
     assert open_rows == 0
