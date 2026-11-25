@@ -43,9 +43,11 @@ def clean_state():
 
 def add_user(email, **fields) -> int:
     db = SessionLocal()
-    user = User(email=email, password_hash=hash_password(fields.pop("password", PASSWORD)),
-                status="active", user_type="student", access_type="paid",
-                is_active=True, max_devices=None, **fields)
+    password = fields.pop("password", PASSWORD)
+    defaults = {"user_type": "student", "access_type": "paid", "is_active": True}
+    defaults.update(fields)
+    user = User(email=email, password_hash=hash_password(password), status="active",
+                max_devices=None, **defaults)
     db.add(user)
     db.commit()
     uid = user.id
@@ -146,3 +148,39 @@ def test_non_admin_cannot_create_an_admin():
         "email": "sneaky@mapoly.edu.ng", "full_name": "Sneaky", "temporary_password": "Temp-2026",
     })
     assert resp.status_code == 403
+
+
+# ---------- user counts for the admin dashboard ----------
+
+
+def test_user_counts_by_type_and_status(admin):
+    add_user(PAID)
+    add_user(OTHER, user_type="lecturer", access_type="free")
+    add_user("gated@mapoly.edu.ng", user_type="gated", access_type="free", is_active=False)
+
+    resp = admin.get("/api/admin/users/counts")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["total"] == 4
+    assert body["by_type"]["student"] == 2  # the admin is a student type too
+    assert body["by_type"]["lecturer"] == 1
+    assert body["by_type"]["guest"] == 0
+    assert body["by_type"]["gated"] == 1
+    assert body["admins"] == 1
+    assert body["disabled"] == 1
+    assert body["active"] == 3
+    assert body["paid"] == 2
+    assert body["free"] == 2
+
+
+def test_user_counts_is_not_caught_by_single_user_route(admin):
+    resp = admin.get("/api/admin/users/counts")
+    assert resp.status_code == 200, resp.text
+    assert "by_type" in resp.json()
+
+
+def test_user_counts_refused_for_non_admin():
+    add_user(PAID)
+    client = sign_in(PAID, MAC_PAID)
+    assert client.get("/api/admin/users/counts").status_code == 403

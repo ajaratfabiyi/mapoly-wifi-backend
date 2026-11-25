@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers.admin import router as admin_router
+from app.routers.admin_counts import router as admin_counts_router
 from app.routers.admin_create import router as admin_create_router
 from app.routers.admin_delete import router as admin_delete_router
 from app.routers.history import router as history_router
@@ -58,6 +59,8 @@ def health() -> dict[str, str]:
 
 
 for router in (
+    # Registered before admin_users, whose /users/{user_id} would otherwise match /users/counts.
+    admin_counts_router,
     login_router,
     auth_router,
     me_router,
