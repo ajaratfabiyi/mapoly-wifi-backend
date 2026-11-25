@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import User
+from app.models import BlockedMac, User
 from app.radius_database import get_radius_db
 from app.redis_client import get_redis
 from app.schemas.login import LoginRequest, LoginResponse
@@ -49,6 +49,9 @@ def login(
         mac = normalise_mac(body.mac)
     except InvalidMacError:
         raise HTTPException(status_code=422, detail="Invalid device address.")
+    # A blocked device cannot sign in, whichever account it uses.
+    if db.scalar(select(BlockedMac.id).where(BlockedMac.mac == mac)) is not None:
+        raise HTTPException(status_code=403, detail="This device is blocked. Contact ICT.")
 
     email = body.email.strip().lower()
     # Rate-limit on the connecting address, not the body (the body is client-supplied).

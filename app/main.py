@@ -4,6 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
+from app.routers.admin import router as admin_router
+from app.routers.admin_finance import router as admin_finance_router
+from app.routers.admin_network import router as admin_network_router
+from app.routers.admin_users import router as admin_users_router
+from app.routers.announcements import admin_router as announcements_admin_router
+from app.routers.announcements import public as announcements_public_router
 from app.routers.auth import router as auth_router
 from app.routers.devices import router as devices_router
 from app.routers.login import router as login_router
@@ -57,6 +63,12 @@ for router in (
     payments_router,
     router_access_router,
     points_router,
+    admin_router,
+    admin_users_router,
+    admin_network_router,
+    admin_finance_router,
+    announcements_public_router,
+    announcements_admin_router,
     webhook_router,
 ):
     app.include_router(router)

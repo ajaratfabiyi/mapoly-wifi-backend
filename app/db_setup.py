@@ -146,6 +146,29 @@ def upgrade_points_schema(engine: Engine) -> None:
             log.info("added plans.points_cost")
 
 
+def upgrade_account_schema(engine: Engine) -> None:
+    """Add the admin, forced-password-change and gated end-date columns. Idempotent."""
+    dt = datetime_sql(engine)
+    with engine.begin() as conn:
+        if not column_exists(engine, "users", "is_admin"):
+            conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE"))
+            log.info("added users.is_admin")
+        if not column_exists(engine, "users", "must_change_password"):
+            conn.execute(
+                text("ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE")
+            )
+            log.info("added users.must_change_password")
+        if not column_exists(engine, "users", "gated_until"):
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN gated_until {dt} NULL"))
+            log.info("added users.gated_until")
+        if not column_exists(engine, "users", "full_name"):
+            conn.execute(text("ALTER TABLE users ADD COLUMN full_name VARCHAR(100) NULL"))
+            log.info("added users.full_name")
+        if not column_exists(engine, "ledger", "refunded_at"):
+            conn.execute(text(f"ALTER TABLE ledger ADD COLUMN refunded_at {dt} NULL"))
+            log.info("added ledger.refunded_at")
+
+
 def seed_plans(engine: Engine) -> None:
     """Insert or update the storefront plans and retire the old ones. Uses the ORM,
     so it works on every database."""
@@ -209,6 +232,7 @@ def run() -> None:
     create_missing_tables(main_engine)
     upgrade_per_device_plans(main_engine)
     upgrade_points_schema(main_engine)
+    upgrade_account_schema(main_engine)
     allow_unlimited_devices(main_engine)
     seed_plans(main_engine)
     widen_radius_usernames(radius_engine)

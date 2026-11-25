@@ -32,6 +32,8 @@ class Ledger(Base):
         default="pending",
     )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Set by an admin once the money has been sent back. Recorded only; the refund itself is done at Paystack.
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="ledger_entries")

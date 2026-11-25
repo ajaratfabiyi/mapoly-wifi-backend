@@ -89,5 +89,8 @@ def build_me(db: Session, user: User, now: datetime) -> MeResponse:
         auto_renew=user.auto_renew,
         max_devices=user.max_devices,
         points=user.points or 0,
+        is_admin=bool(user.is_admin),
+        must_change_password=bool(user.must_change_password),
+        gated_until=user.gated_until,
         devices=[device_out(d, user, device_plan(db, d), now) for d in devices],
     )

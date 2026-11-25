@@ -28,7 +28,17 @@ class MeResponse(BaseModel):
     auto_renew: bool
     max_devices: int | None  # null means no limit
     points: int  # points balance, 1 point = ₦1 when spent
+    is_admin: bool
+    must_change_password: bool
+    gated_until: UtcDatetime = None  # gated accounts only; null means no end date
     devices: list[DeviceOut]
+
+
+class PasswordChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
 
 
 class ProfileUpdate(BaseModel):

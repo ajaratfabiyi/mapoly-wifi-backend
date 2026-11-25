@@ -33,7 +33,8 @@ def radius_tables() -> dict[str, str]:
         ),
         "radacct": (
             f"CREATE TABLE radacct (radacctid {pk}, username VARCHAR(255),"
-            f" callingstationid VARCHAR(32), acctstoptime {ts} NULL,"
+            f" callingstationid VARCHAR(32), framedipaddress VARCHAR(45) NULL,"
+            f" acctstarttime {ts} NULL, acctstoptime {ts} NULL,"
             " acctterminatecause VARCHAR(32))"
         ),
     }

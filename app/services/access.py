@@ -3,7 +3,7 @@
 - Each device has its own plan and expiry (user_devices.access_expires_at). A plan
   bought for one device works only on that device.
 - Free users (gated) have access on every bound device while the account is active.
-  They have no expiry.
+  They have no expiry unless an admin sets gated_until.
 - Renewal extends a device's plan from the later of now or that device's expiry.
 """
 
@@ -21,8 +21,13 @@ def has_device_access(user: User, device: UserDevice, now: datetime) -> bool:
     if not account_usable(user, now):
         return False
     if user.access_type == "free":
-        return True
+        return gated_access_open(user, now)
     return device.access_expires_at is not None and device.access_expires_at > now
+
+
+def gated_access_open(user: User, now: datetime) -> bool:
+    """Gated accounts have no end date unless an admin sets one."""
+    return user.gated_until is None or user.gated_until > now
 
 
 def any_device_has_access(user: User, devices: list[UserDevice], now: datetime) -> bool:
@@ -40,6 +45,10 @@ def extend_device_access(device: UserDevice, duration_hours: int, now: datetime)
 
 def device_seconds_left(user: User, device: UserDevice, now: datetime) -> int | None:
     """Seconds until this device's expiry, for RADIUS Session-Timeout. None means no timeout."""
-    if user.access_type == "free" or device.access_expires_at is None:
+    if user.access_type == "free":
+        if user.gated_until is None:
+            return None
+        return max(1, int((user.gated_until - now).total_seconds()))
+    if device.access_expires_at is None:
         return None
     return max(1, int((device.access_expires_at - now).total_seconds()))

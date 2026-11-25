@@ -23,6 +23,7 @@ class User(Base):
         Enum("student", "lecturer", "guest", "gated", name="user_type"),
     )
 
+    full_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     matric_no: Mapped[str | None] = mapped_column(String(50), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     department: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -41,6 +42,13 @@ class User(Base):
 
     # Points balance. 1 point = ₦1 when spent. Every change is also written to points_entries.
     points: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+    # Set by an admin. Admins can open the admin routes.
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Set when an admin creates the account with a temporary password. Cleared on change.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Gated accounts only: when their access ends. None means no end date.
+    gated_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
