@@ -5,6 +5,9 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers.admin import router as admin_router
+from app.routers.admin_create import router as admin_create_router
+from app.routers.admin_delete import router as admin_delete_router
+from app.routers.history import router as history_router
 from app.routers.admin_finance import router as admin_finance_router
 from app.routers.admin_network import router as admin_network_router
 from app.routers.admin_users import router as admin_users_router
@@ -67,6 +70,9 @@ for router in (
     admin_users_router,
     admin_network_router,
     admin_finance_router,
+    admin_delete_router,
+    admin_create_router,
+    history_router,
     announcements_public_router,
     announcements_admin_router,
     webhook_router,

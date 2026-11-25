@@ -15,7 +15,11 @@ class Ledger(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     reference: Mapped[str] = mapped_column(String(100), unique=True)
 
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # Nullable so a payment survives its account being deleted. payer_email keeps who paid.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    payer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     device_id: Mapped[int | None] = mapped_column(
         ForeignKey("user_devices.id", ondelete="SET NULL"), nullable=True
     )

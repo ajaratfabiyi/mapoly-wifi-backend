@@ -167,6 +167,9 @@ def upgrade_account_schema(engine: Engine) -> None:
         if not column_exists(engine, "ledger", "refunded_at"):
             conn.execute(text(f"ALTER TABLE ledger ADD COLUMN refunded_at {dt} NULL"))
             log.info("added ledger.refunded_at")
+        if not column_exists(engine, "ledger", "payer_email"):
+            conn.execute(text("ALTER TABLE ledger ADD COLUMN payer_email VARCHAR(255) NULL"))
+            log.info("added ledger.payer_email")
 
 
 def seed_plans(engine: Engine) -> None:
