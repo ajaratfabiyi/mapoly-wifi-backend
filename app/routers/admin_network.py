@@ -129,7 +129,13 @@ def online_now(
         "SELECT username, callingstationid, framedipaddress, acctstarttime "
         "FROM radacct WHERE acctstoptime IS NULL ORDER BY acctstarttime DESC LIMIT 500"
     )).all()
-    return [OnlineSession(username=r[0], mac_address=r[1], ip_address=r[2], started_at=r[3])
+    # PostgreSQL returns inet columns as ipaddress objects; the API wants plain strings.
+    return [OnlineSession(
+                username=r[0],
+                mac_address=r[1],
+                ip_address=None if r[2] is None else str(r[2]),
+                started_at=r[3],
+            )
             for r in rows]
 
 
