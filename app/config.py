@@ -24,7 +24,13 @@ class Settings(BaseSettings):
     PAYSTACK_SECRET_KEY: str
     PAYSTACK_PUBLIC_KEY: str = ""
 
+    # One address, or several separated by commas: the Vercel site, a subdomain, and the
+    # router's login page (for example http://login.mapoly.local).
     FRONTEND_ORIGIN: str
+
+    @property
+    def frontend_origins(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.FRONTEND_ORIGIN.split(",") if o.strip()]
     LOGIN_TOKEN_TTL_SECONDS: int = 60
     DEFAULT_MAX_DEVICES: int = 0  # 0 means no limit on devices per account
 

@@ -46,7 +46,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 # Only the portal's own origin may call the API from a browser (Section 8).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_ORIGIN],
+    allow_origins=settings.frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
