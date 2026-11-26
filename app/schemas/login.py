@@ -8,7 +8,9 @@ class LoginRequest(BaseModel):
 
     email: EmailStr
     password: str = Field(min_length=6, max_length=256)
-    mac: str = Field(max_length=32)
+    # Optional. Sign-in without a MAC opens the dashboard only; the device is bound on a later
+    # sign-in that carries its MAC.
+    mac: str | None = Field(default=None, max_length=32)
     ip: str | None = Field(default=None, max_length=45)
     deviceName: str | None = Field(default=None, max_length=100)
 

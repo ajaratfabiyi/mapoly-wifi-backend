@@ -309,7 +309,7 @@ def test_delete_device_frees_the_slot(make_client):
     sign_in(client, mac=MAC1)
     device_id = my_device_id(client, MAC1)
 
-    assert client.delete(f"/api/devices/{device_id}").status_code == 200
+    assert client.delete(f"/api/devices/{device_id}?confirm=true").status_code == 200
 
     db = SessionLocal()
     remaining = db.scalar(select(func.count()).select_from(UserDevice))
@@ -327,7 +327,7 @@ def test_cannot_touch_another_users_device(make_client):
     b = make_client()
     sign_in(b, email="b@mapoly.edu.ng", mac=MAC2)
     assert b.patch(f"/api/devices/{a_device}", json={"name": "Hijacked"}).status_code == 404
-    assert b.delete(f"/api/devices/{a_device}").status_code == 404
+    assert b.delete(f"/api/devices/{a_device}?confirm=true").status_code == 404
 
 
 # ---------- plans ----------
@@ -482,3 +482,4 @@ def test_webhook_ignores_other_events(make_client):
         headers={"x-paystack-signature": sig, "content-type": "application/json"},
     )
     assert resp.status_code == 200
+

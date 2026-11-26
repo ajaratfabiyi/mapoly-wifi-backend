@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import User, UserDevice
+from app.services.plan_credits import claim_plan_credit
 
 
 class DeviceLimitReached(Exception):
@@ -64,4 +65,6 @@ def bind_device(
         last_seen=now,
     )
     db.add(device)
+    # A new device takes an open plan slot the account already paid for, if there is one.
+    claim_plan_credit(db, user, device, now)
     return device

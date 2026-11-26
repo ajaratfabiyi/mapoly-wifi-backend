@@ -8,14 +8,14 @@ from app.database import get_db
 from app.dependencies import require_admin
 from app.models import Ledger, Plan, User, UserDevice
 from app.radius_database import get_radius_db
-from app.schemas.admin_tools import PaymentOut, PlanAdminOut, PlanPatch, ReportOut
+from app.schemas.admin_tools import PaymentOut, PlanAdminOut, PlanCreate, PlanPatch, ReportOut
 from app.services.admin_log import record_admin_action
 from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 PAYMENT_STATUSES = ("pending", "success", "failed")
-REPLACE_NOT_NULL = ("title", "price_kobo", "points_award", "is_active")
+REPLACE_NOT_NULL = ("title", "price_kobo", "points_award", "device_count", "is_active")
 
 
 @router.get("/payments", response_model=list[PaymentOut])
@@ -73,11 +73,42 @@ def list_plans_admin(
     db: Session = Depends(get_db),
 ) -> list[PlanAdminOut]:
     plans = db.scalars(select(Plan).order_by(Plan.duration_hours)).all()
-    return [PlanAdminOut(id=p.id, title=p.title, duration_hours=p.duration_hours,
-                         price_naira=p.price_kobo // 100, speed_limit_mbps=p.speed_limit_mbps,
-                         points_award=p.points_award, points_cost=p.points_cost,
-                         is_active=bool(p.is_active))
-            for p in plans]
+    return [_plan_out(p) for p in plans]
+
+
+def _plan_out(p: Plan) -> PlanAdminOut:
+    return PlanAdminOut(id=p.id, title=p.title, duration_hours=p.duration_hours,
+                        price_naira=p.price_kobo // 100, speed_limit_mbps=p.speed_limit_mbps,
+                        points_award=p.points_award, points_cost=p.points_cost,
+                        device_count=p.device_count or 1, is_active=bool(p.is_active))
+
+
+@router.post("/plans", response_model=PlanAdminOut, status_code=201)
+def create_plan(
+    body: PlanCreate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> PlanAdminOut:
+    """Add a new plan to the storefront. Its id cannot be changed later."""
+    if db.get(Plan, body.id) is not None:
+        raise HTTPException(status_code=422, detail="A plan with this id already exists.")
+    plan = Plan(
+        id=body.id,
+        title=body.title.strip(),
+        duration_hours=body.duration_hours,
+        price_kobo=body.price_kobo,
+        speed_limit_mbps=body.speed_limit_mbps,
+        points_award=body.points_award,
+        points_cost=body.points_cost,
+        device_count=body.device_count,
+        is_active=body.is_active,
+    )
+    db.add(plan)
+    record_admin_action(db, admin, "create_plan", None,
+                        f"{plan.id}: {plan.title}, {plan.device_count} device(s), "
+                        f"N{plan.price_kobo // 100}", utc_now())
+    db.commit()
+    return _plan_out(plan)
 
 
 @router.patch("/plans/{plan_id}", response_model=PlanAdminOut)
@@ -113,16 +144,16 @@ def update_plan(
         elif field == "points_cost":
             changes.append(f"costs {plan.points_cost} -> {value}")
             plan.points_cost = value
+        elif field == "device_count":
+            changes.append(f"devices {plan.device_count} -> {value}")
+            plan.device_count = value
         elif field == "is_active":
             plan.is_active = value
             changes.append("on sale" if value else "off sale")
     if changes:
         record_admin_action(db, admin, "update_plan", None, f"{plan.id}: " + ", ".join(changes), utc_now())
     db.commit()
-    return PlanAdminOut(id=plan.id, title=plan.title, duration_hours=plan.duration_hours,
-                        price_naira=plan.price_kobo // 100, speed_limit_mbps=plan.speed_limit_mbps,
-                        points_award=plan.points_award, points_cost=plan.points_cost,
-                        is_active=bool(plan.is_active))
+    return _plan_out(plan)
 
 
 @router.get("/reports/summary", response_model=ReportOut)

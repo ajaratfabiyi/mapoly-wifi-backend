@@ -167,6 +167,12 @@ def upgrade_account_schema(engine: Engine) -> None:
         if not column_exists(engine, "ledger", "refunded_at"):
             conn.execute(text(f"ALTER TABLE ledger ADD COLUMN refunded_at {dt} NULL"))
             log.info("added ledger.refunded_at")
+        if not column_exists(engine, "plans", "device_count"):
+            conn.execute(text("ALTER TABLE plans ADD COLUMN device_count INTEGER NOT NULL DEFAULT 1"))
+            log.info("added plans.device_count")
+        if not column_exists(engine, "user_devices", "priority"):
+            conn.execute(text("ALTER TABLE user_devices ADD COLUMN priority INTEGER NULL"))
+            log.info("added user_devices.priority")
         if not column_exists(engine, "ledger", "payer_email"):
             conn.execute(text("ALTER TABLE ledger ADD COLUMN payer_email VARCHAR(255) NULL"))
             log.info("added ledger.payer_email")

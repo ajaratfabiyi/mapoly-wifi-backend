@@ -122,7 +122,24 @@ class PlanAdminOut(BaseModel):
     speed_limit_mbps: int | None
     points_award: int
     points_cost: int | None
+    device_count: int
     is_active: bool
+
+
+class PlanCreate(BaseModel):
+    """A new plan for the storefront. The id is fixed once created."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=3, max_length=30, pattern=r"^[a-z][a-z0-9_]*$")
+    title: str = Field(min_length=2, max_length=100)
+    duration_hours: int = Field(ge=1, le=24 * 366)
+    price_kobo: int = Field(ge=0, le=10_000_000_000)
+    speed_limit_mbps: int | None = Field(default=None, ge=1, le=10_000)
+    points_award: int = Field(default=0, ge=0, le=1_000_000)
+    points_cost: int | None = Field(default=None, ge=0, le=10_000_000)
+    device_count: int = Field(default=1, ge=1, le=50)
+    is_active: bool = True
 
 
 class PlanPatch(BaseModel):
@@ -135,6 +152,7 @@ class PlanPatch(BaseModel):
     speed_limit_mbps: int | None = Field(default=None, ge=1, le=10_000)
     points_award: int | None = Field(default=None, ge=0, le=1_000_000)
     points_cost: int | None = Field(default=None, ge=0, le=10_000_000)
+    device_count: int | None = Field(default=None, ge=1, le=50)
     is_active: bool | None = None
 
 

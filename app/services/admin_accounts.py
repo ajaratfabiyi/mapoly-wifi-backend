@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.models import BlockedMac, Ledger, Plan, PointsEntry, User, UserDevice
 from app.schemas.admin import GatedUserCreate
 from app.security.passwords import hash_password
-from app.services.access import extend_device_access
+from app.services.plan_devices import apply_plan_to_devices
 from app.services.admin_log import record_admin_action
 from app.services.coa_queue import enqueue_disconnect
 from app.services.device_cache import cache_device_removed
@@ -200,7 +200,8 @@ def grant_plan_to_device(
             created_at=now,
         )
     )
-    expires = extend_device_access(device, plan.duration_hours, now)
+    apply_plan_to_devices(db, user, device, plan, now)
+    expires = device.access_expires_at
     record_admin_action(db, admin, "grant_plan", user.id,
                         f"{plan.id} to {device.mac_address}", now)
     db.commit()

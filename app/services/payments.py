@@ -13,8 +13,8 @@ import redis
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Ledger, Plan, UserDevice
-from app.services.access import extend_device_access
+from app.models import Ledger, Plan, User, UserDevice
+from app.services.plan_devices import apply_plan_to_devices
 from app.services.login_tokens import group_for
 from app.services.points import award_purchase_points
 from app.services.radius import device_username, grant_mac_access
@@ -59,42 +59,52 @@ def apply_successful_charge(
         device = db.scalar(
             select(UserDevice).where(UserDevice.id == ledger.device_id).with_for_update()
         )
-    if device is None:
-        # The device was removed after checkout. The customer has paid for a device that
-        # no longer exists, so nothing is granted. Logged for a manual refund.
-        ledger.status = "failed"
-        db.commit()
-        log.warning("Charge %s paid for a device that no longer exists; refund needed", reference)
-        return DEVICE_GONE
+        if device is None:
+            # The device the customer named was removed after checkout. Nothing is granted.
+            ledger.status = "failed"
+            db.commit()
+            log.warning("Charge %s paid for a device that no longer exists; refund needed", reference)
+            return DEVICE_GONE
 
+    user = db.get(User, ledger.user_id)
     ledger.status = "success"
     ledger.paid_at = paid_at
-    extend_device_access(device, plan.duration_hours, now)
+    apply_plan_to_devices(db, user, device, plan, now)
     # Same transaction as the status change, so points are credited exactly once.
     award_purchase_points(db, reference, plan, now)
     db.commit()
     return APPLIED
 
 
-def grant_mac_for_charge(db: Session, radius_db: Session, reference: str, now: datetime) -> None:
-    """Let the paid device onto the network by MAC, so it reconnects without logging in.
+def live_devices(db: Session, user_id: int, now: datetime) -> list[UserDevice]:
+    """The account's devices whose plan is still running."""
+    return list(
+        db.scalars(
+            select(UserDevice).where(
+                UserDevice.user_id == user_id,
+                UserDevice.access_expires_at.is_not(None),
+                UserDevice.access_expires_at > now,
+            )
+        ).all()
+    )
 
-    Safe to call again for the same charge: it replaces the device's rows with the
-    current expiry. Call it after apply_successful_charge returns APPLIED or ALREADY_APPLIED.
+
+def grant_mac_for_charge(db: Session, radius_db: Session, reference: str, now: datetime) -> None:
+    """Let every device with a live plan onto the network by MAC, so it reconnects without
+    logging in. A purchase can cover devices other than the one named on it.
+
+    Safe to call again: it replaces each device's rows with its current expiry. Call it after
+    apply_successful_charge returns APPLIED or ALREADY_APPLIED.
     """
     ledger = db.scalar(select(Ledger).where(Ledger.reference == reference))
-    if ledger is None or ledger.device_id is None or ledger.status != "success":
+    if ledger is None or ledger.status != "success" or ledger.user_id is None:
         return
-    device = db.get(UserDevice, ledger.device_id)
-    if device is None or device.access_expires_at is None:
+    user = db.get(User, ledger.user_id)
+    if user is None:
         return
-    grant_mac_access(
-        radius_db,
-        device.mac_address,
-        device.access_expires_at,
-        group_for(device.user.user_type),
-        now,
-    )
+    group = group_for(user.user_type)
+    for device in live_devices(db, user.id, now):
+        grant_mac_access(radius_db, device.mac_address, device.access_expires_at, group, now)
 
 
 def cache_status(r: redis.Redis, username: str, expires_at: datetime, now: datetime) -> None:
@@ -106,12 +116,13 @@ def cache_status(r: redis.Redis, username: str, expires_at: datetime, now: datet
 
 
 def cache_charge_status(r: redis.Redis, db: Session, reference: str, now: datetime) -> None:
-    """Cache the status of the device a successful charge paid for."""
+    """Cache the status of every device a successful charge gave a live plan."""
     ledger = db.scalar(select(Ledger).where(Ledger.reference == reference))
-    if ledger is None or ledger.device_id is None:
+    if ledger is None or ledger.status != "success" or ledger.user_id is None:
         return
-    device = db.get(UserDevice, ledger.device_id)
-    if device is None or device.access_expires_at is None:
+    user = db.get(User, ledger.user_id)
+    if user is None:
         return
-    cache_status(r, device_username(ledger.user.email, device.mac_address),
-                 device.access_expires_at, now)
+    for device in live_devices(db, user.id, now):
+        cache_status(r, device_username(user.email, device.mac_address),
+                     device.access_expires_at, now)

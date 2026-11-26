@@ -11,6 +11,14 @@ class DeviceCreate(BaseModel):
     mac: str = Field(max_length=32)
 
 
+class DevicePriority(BaseModel):
+    """Device ids in the order the student wants plans to link to them. Listed first = first."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    device_ids: list[int] = Field(max_length=50)
+
+
 class DeviceUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

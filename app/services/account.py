@@ -64,6 +64,7 @@ def device_out(device: UserDevice, user: User, plan: Plan | None, now: datetime)
         auto_renew=device.auto_renew,
         status=device_status(device, now),
         last_seen=device.last_seen,
+        priority=device.priority,
     )
 
 

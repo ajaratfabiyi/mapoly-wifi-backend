@@ -21,3 +21,5 @@ class Plan(Base):
     points_award: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Points needed to buy this plan with points (1 point = ₦1). None means points cannot buy it.
     points_cost: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # How many of the account's devices one purchase covers. 1 means the plan is for one device.
+    device_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")

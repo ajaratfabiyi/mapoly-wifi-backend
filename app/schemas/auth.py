@@ -9,7 +9,8 @@ class RegisterRequest(BaseModel):
     user_type: Literal["student", "lecturer", "guest", "gated"]
     email: EmailStr
     password: str = Field(min_length=6, max_length=256)
-    mac: str = Field(max_length=32)
+    # Optional. Without a MAC the account is created and the device is added later.
+    mac: str | None = Field(default=None, max_length=32)
     ip: str | None = Field(default=None, max_length=45)
     deviceName: str | None = Field(default=None, max_length=100)
     matric_no: str | None = Field(default=None, max_length=50)

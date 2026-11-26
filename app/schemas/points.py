@@ -5,7 +5,7 @@ from app.schemas.common import UtcDatetime
 
 class RedeemRequest(BaseModel):
     plan_id: str = Field(max_length=30)
-    device_id: int
+    device_id: int | None = None
 
 
 class RedeemResponse(BaseModel):

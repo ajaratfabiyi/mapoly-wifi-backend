@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -13,7 +13,7 @@ from app.models import User, UserDevice
 from app.radius_database import get_radius_db
 from app.redis_client import get_redis
 from app.schemas.auth import MessageResponse
-from app.schemas.devices import DeviceCreate, DeviceUpdate
+from app.schemas.devices import DeviceCreate, DevicePriority, DeviceUpdate
 from app.schemas.me import DeviceOut
 from app.services.account import device_out, device_plan
 from app.services.coa_queue import enqueue_disconnect
@@ -85,17 +85,48 @@ def update_device(
     return device_out(device, user, device_plan(db, device), utc_now())
 
 
+@router.put("/priority", response_model=MessageResponse)
+def set_device_priority(
+    body: DevicePriority,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    """Set the order plans link to this account's devices. Devices not listed lose their
+    priority and come last."""
+    devices = list(db.scalars(select(UserDevice).where(UserDevice.user_id == user.id)).all())
+    own_ids = {d.id for d in devices}
+    if len(set(body.device_ids)) != len(body.device_ids) or not set(body.device_ids) <= own_ids:
+        raise HTTPException(
+            status_code=422,
+            detail="Each device must be listed once, and must belong to your account.",
+        )
+    order = {device_id: position for position, device_id in enumerate(body.device_ids, start=1)}
+    for device in devices:
+        device.priority = order.get(device.id)
+    db.commit()
+    return MessageResponse(ok=True, message="Device priority saved.")
+
+
 @router.delete("/{device_id}", response_model=MessageResponse)
 def delete_device(
     device_id: int,
+    confirm: bool = Query(default=False),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     radius_db: Session = Depends(get_radius_db),
     r: redis.Redis = Depends(get_redis),
 ) -> MessageResponse:
-    """Order matters: RADIUS first, then the database. If RADIUS fails, the device
+    """Unbind a device from the account. The request must say confirm=true: the dashboard
+    shows a warning first, because any time left on this device's plan is lost.
+
+    Order matters: RADIUS first, then the database. If RADIUS fails, the device
     is kept and the user can retry. The reverse could leave access live for a
     device the user thinks they removed."""
+    if not confirm:
+        raise HTTPException(
+            status_code=422,
+            detail="Confirm that you want to remove this device. Any time left on its plan is lost.",
+        )
     device = _own_device(db, user, device_id)
     now = utc_now()
 

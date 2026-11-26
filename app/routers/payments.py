@@ -39,20 +39,19 @@ def initialize_payment(
     if user.user_type == "gated" or user.access_type == "free":
         raise HTTPException(status_code=403, detail="Gated accounts do not buy plans.")
 
-    if body.device_id is None:
-        # Section 5.9 leaves "device the user is on" open (decision). Until decided,
-        # the client must say which device the plan is for.
-        raise HTTPException(status_code=422, detail="Choose a device for this plan.")
-
     plan = db.scalar(select(Plan).where(Plan.id == body.plan_id, Plan.is_active.is_(True)))
     if plan is None:
         raise HTTPException(status_code=404, detail="Plan not found.")
 
-    device = db.get(UserDevice, body.device_id)
-    if device is None:
-        raise HTTPException(status_code=404, detail="Device not found.")
-    if device.user_id != user.id:
-        raise HTTPException(status_code=403, detail="This device belongs to another account.")
+    # The device is optional. Without one, the plan goes on the account and links to devices
+    # by priority, and to any device bound later.
+    device = None
+    if body.device_id is not None:
+        device = db.get(UserDevice, body.device_id)
+        if device is None:
+            raise HTTPException(status_code=404, detail="Device not found.")
+        if device.user_id != user.id:
+            raise HTTPException(status_code=403, detail="This device belongs to another account.")
 
     now = utc_now()
     reference = _new_reference(now)
@@ -60,7 +59,7 @@ def initialize_payment(
         Ledger(
             reference=reference,
             user_id=user.id,
-            device_id=device.id,
+            device_id=device.id if device else None,
             plan_id=plan.id,
             amount_kobo=plan.price_kobo,
             status="pending",

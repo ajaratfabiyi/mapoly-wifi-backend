@@ -44,14 +44,16 @@ def login(
 ) -> LoginResponse:
     settings = get_settings()
 
-    # Step 1: reject a malformed MAC before any database work.
-    try:
-        mac = normalise_mac(body.mac)
-    except InvalidMacError:
-        raise HTTPException(status_code=422, detail="Invalid device address.")
-    # A blocked device cannot sign in, whichever account it uses.
-    if db.scalar(select(BlockedMac.id).where(BlockedMac.mac == mac)) is not None:
-        raise HTTPException(status_code=403, detail="This device is blocked. Contact ICT.")
+    # Step 1: reject a malformed MAC before any database work. A MAC is optional.
+    mac = None
+    if body.mac:
+        try:
+            mac = normalise_mac(body.mac)
+        except InvalidMacError:
+            raise HTTPException(status_code=422, detail="Invalid device address.")
+        # A blocked device cannot sign in, whichever account it uses.
+        if db.scalar(select(BlockedMac.id).where(BlockedMac.mac == mac)) is not None:
+            raise HTTPException(status_code=403, detail="This device is blocked. Contact ICT.")
 
     email = body.email.strip().lower()
     # Rate-limit on the connecting address, not the body (the body is client-supplied).
@@ -84,6 +86,17 @@ def login(
     if not user.is_active or user.status == "disabled":
         raise HTTPException(
             status_code=403, detail="This account has been disabled. Contact ICT."
+        )
+
+    # Without a MAC there is no device to bind or connect. Open the dashboard only.
+    if mac is None:
+        set_session_cookie(response, user.id)
+        return LoginResponse(
+            username=email,
+            token=None,
+            expires_in=0,
+            has_active_plan=False,
+            access_expires_at=None,
         )
 
     # Step 6: bind the device. Each MAC belongs to one account; each account has max_devices.

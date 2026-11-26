@@ -44,10 +44,12 @@ def register(
         raise HTTPException(status_code=429, detail="Too many attempts. Try again in 10 minutes.")
     rate_limit.record_failure(r, ip_key)
 
-    try:
-        mac = normalise_mac(body.mac)
-    except InvalidMacError:
-        raise HTTPException(status_code=422, detail="Invalid device address.")
+    mac = None
+    if body.mac:
+        try:
+            mac = normalise_mac(body.mac)
+        except InvalidMacError:
+            raise HTTPException(status_code=422, detail="Invalid device address.")
 
     now = utc_now()
     email = body.email.strip().lower()
@@ -76,14 +78,15 @@ def register(
     if body.matric_no and user.user_type == "student":
         user.matric_no = body.matric_no
 
-    try:
-        bind_device(db, user, mac, body.ip, body.deviceName, now)
-    except DeviceOwnedByAnotherUser:
-        db.rollback()
-        raise HTTPException(status_code=409, detail=DEVICE_OWNED)
-    except DeviceLimitReached:
-        db.rollback()
-        raise HTTPException(status_code=409, detail=DEVICE_LIMIT)
+    if mac is not None:
+        try:
+            bind_device(db, user, mac, body.ip, body.deviceName, now)
+        except DeviceOwnedByAnotherUser:
+            db.rollback()
+            raise HTTPException(status_code=409, detail=DEVICE_OWNED)
+        except DeviceLimitReached:
+            db.rollback()
+            raise HTTPException(status_code=409, detail=DEVICE_LIMIT)
 
     try:
         db.commit()
@@ -92,6 +95,8 @@ def register(
         db.rollback()
         raise HTTPException(status_code=409, detail=ALREADY_REGISTERED)
 
+    if mac is None:
+        return MessageResponse(ok=True, message="Account created. Sign in on a device to connect it.")
     cache_device_added(r, email, mac)
     return MessageResponse(ok=True, message="Device registered. Sign in to connect.")
 

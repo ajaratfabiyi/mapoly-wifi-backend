@@ -13,6 +13,7 @@ class DeviceOut(BaseModel):
     auto_renew: bool
     status: str
     last_seen: UtcDatetime = None
+    priority: int | None = None
 
 
 class MeResponse(BaseModel):

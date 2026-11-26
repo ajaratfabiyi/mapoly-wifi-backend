@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -29,6 +29,9 @@ class UserDevice(Base):
     access_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # The access_expires_at value the expiry job last handled, so each expiry runs once.
     expiry_handled_for: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # The student's order for plan purchases. Lower comes first. NULL comes last.
+    priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     bound_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_seen: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

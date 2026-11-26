@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Ledger, Plan, PointsEntry, User, UserDevice
-from app.services.access import extend_device_access
+from app.services.plan_devices import apply_plan_to_devices
 
 
 class InsufficientPoints(Exception):
@@ -48,7 +48,7 @@ def award_purchase_points(db: Session, reference: str, plan: Plan, now: datetime
 
 
 def redeem_points_for_plan(
-    db: Session, user: User, plan: Plan, device: UserDevice, now: datetime
+    db: Session, user: User, plan: Plan, device: UserDevice | None, now: datetime
 ) -> str:
     """Spend points on a plan for one device. Returns the ledger reference.
 
@@ -67,7 +67,7 @@ def redeem_points_for_plan(
         Ledger(
             reference=reference,
             user_id=locked.id,
-            device_id=device.id,
+            device_id=device.id if device else None,
             plan_id=plan.id,
             amount_kobo=plan.price_kobo,
             payment_method=None,  # Not paid in cash; the points entry below records it.
@@ -77,6 +77,6 @@ def redeem_points_for_plan(
         )
     )
     _record(db, locked, -plan.points_cost, "redeem", reference, now)
-    extend_device_access(device, plan.duration_hours, now)
+    apply_plan_to_devices(db, locked, device, plan, now)
     db.commit()
     return reference

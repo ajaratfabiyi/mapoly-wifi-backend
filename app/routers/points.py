@@ -32,11 +32,13 @@ def redeem_points(
     if plan is None:
         raise HTTPException(status_code=404, detail="Plan not found.")
 
-    device = db.get(UserDevice, body.device_id)
-    if device is None:
-        raise HTTPException(status_code=404, detail="Device not found.")
-    if device.user_id != user.id:
-        raise HTTPException(status_code=403, detail="This device belongs to another account.")
+    device = None
+    if body.device_id is not None:
+        device = db.get(UserDevice, body.device_id)
+        if device is None:
+            raise HTTPException(status_code=404, detail="Device not found.")
+        if device.user_id != user.id:
+            raise HTTPException(status_code=403, detail="This device belongs to another account.")
 
     now = utc_now()
     try:
@@ -52,10 +54,11 @@ def redeem_points(
     cache_charge_status(r, db, reference, now)
 
     db.refresh(user)
-    db.refresh(device)
+    if device is not None:
+        db.refresh(device)
     return RedeemResponse(
         status="success",
         reference=reference,
         points_balance=user.points,
-        access_expires_at=device.access_expires_at,
+        access_expires_at=device.access_expires_at if device is not None else None,
     )

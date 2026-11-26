@@ -27,6 +27,7 @@ def list_plans(db: Session = Depends(get_db)) -> list[PlanOut]:
             popular=p.id == POPULAR_PLAN_ID,
             points_award=p.points_award,
             points_cost=p.points_cost,
+            device_count=p.device_count or 1,
         )
         for p in plans
     ]

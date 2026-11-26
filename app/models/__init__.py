@@ -6,6 +6,7 @@ from app.models.device import UserDevice
 from app.models.ledger import Ledger
 from app.models.login_token import LoginToken
 from app.models.plan import Plan
+from app.models.plan_credit import AccountPlanCredit
 from app.models.admin_action import AdminAction
 from app.models.announcement import Announcement
 from app.models.block import BlockedMac
@@ -16,5 +17,5 @@ from app.models.user import User
 __all__ = [
     "Base", "User", "UserDevice", "Plan", "Ledger", "PointsEntry", "AdminAction",
     "BlockedMac", "Announcement",
-    "SessionLog", "LoginToken", "CoaQueue",
+    "SessionLog", "LoginToken", "CoaQueue", "AccountPlanCredit",
 ]
