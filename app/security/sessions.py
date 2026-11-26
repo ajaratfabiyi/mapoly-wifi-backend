@@ -5,9 +5,13 @@ Signed with SECRET_KEY. Nothing is stored server-side, so a session cannot be
 revoked before it expires. Password change does not revoke it either; add a
 session version on the user if that matters.
 
-SameSite is "none", not "lax". The frontend (vercel.app) and the API (onrender.com)
+SameSite is "none", not "lax". The frontend (vercel.app) and the API (eduwifi.name.ng)
 are different sites, so the browser sends a Lax cookie on no cross-site fetch.
 "None" requires Secure, which production always is (HTTPS only).
+
+Caveat: Safari (iPhone and Mac) blocks third-party cookies even with SameSite=None, so
+the dashboard cannot stay signed in there while the frontend and API are on different sites.
+Serving the frontend from a subdomain of eduwifi.name.ng fixes this.
 """
 
 import hashlib
