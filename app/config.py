@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     COA_NAS_HOST: str = ""
     RADIUS_COA_SECRET: str = ""
 
+    # RouterOS API on the router, used to end a hotspot session even when RADIUS has no record of it.
+    # Empty ROUTER_API_HOST means this is skipped. Use a router user with API access only.
+    ROUTER_API_HOST: str = ""
+    ROUTER_API_PORT: int = 8728
+    ROUTER_API_USER: str = ""
+    ROUTER_API_PASSWORD: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

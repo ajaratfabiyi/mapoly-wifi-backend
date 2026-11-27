@@ -19,6 +19,7 @@ Run every minute from cron on the AAA VM:
 """
 
 import logging
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from sqlalchemy import or_, select, text
@@ -30,7 +31,9 @@ from app.database import SessionLocal
 from app.models import CoaQueue
 from app.radius_database import RadiusSessionLocal
 from app.services.coa import send_disconnect
+from app.services.coa_queue import DEVICE_REASONS
 from app.services.radius import ACCOUNT_MATCH, account_match_params
+from app.services.routeros_api import RouterApiError, end_hotspot_sessions
 from app.utils.mac import normalise_mac
 from app.utils.time import utc_now
 
@@ -83,13 +86,25 @@ def process_row(
     host: str,
     secret: str,
     now: datetime,
+    router_end: Callable[[str], None] | None = None,
 ) -> bool:
-    """Send the disconnects for one row. Returns True when the row is done."""
+    """Send the disconnects for one row. Returns True when the row is done.
+
+    router_end(mac) ends the hotspot session on the router. It is used for device rows only.
+    """
     sessions = open_sessions(radius_db, row)
     failed = []
     for username, station in sessions:
         if not send_disconnect(host, secret, username, station):
             failed.append(station)
+
+    # RADIUS may have no record of the session. Ask the router directly as well.
+    if router_end is not None and row.mac_address and row.reason in DEVICE_REASONS:
+        try:
+            router_end(row.mac_address)
+        except (OSError, RouterApiError) as exc:
+            failed.append(row.mac_address)
+            log.warning("router API for %s failed: %s", row.mac_address, exc)
 
     if not failed:
         row.sent_at = now
@@ -111,6 +126,14 @@ def run(now: datetime | None = None) -> dict[str, int]:
     if not settings.COA_NAS_HOST or not settings.RADIUS_COA_SECRET:
         raise RuntimeError("COA_NAS_HOST and RADIUS_COA_SECRET must be set on the AAA VM")
 
+    router_end = None
+    if settings.ROUTER_API_HOST and settings.ROUTER_API_PASSWORD:
+        def router_end(mac: str) -> None:
+            end_hotspot_sessions(
+                settings.ROUTER_API_HOST, settings.ROUTER_API_PORT,
+                settings.ROUTER_API_USER, settings.ROUTER_API_PASSWORD, mac,
+            )
+
     now = now or utc_now()
     db = SessionLocal()
     radius_db = RadiusSessionLocal()
@@ -118,7 +141,8 @@ def run(now: datetime | None = None) -> dict[str, int]:
     try:
         for row in pending_rows(db, now):
             try:
-                if process_row(db, radius_db, row, settings.COA_NAS_HOST, settings.RADIUS_COA_SECRET, now):
+                if process_row(db, radius_db, row, settings.COA_NAS_HOST, settings.RADIUS_COA_SECRET, now,
+                               router_end=router_end):
                     done += 1
                 else:
                     retry += 1
