@@ -127,6 +127,8 @@ def disable_account(db: Session, radius_db: Session, admin: User, user: User, no
     devices = db.scalars(select(UserDevice).where(UserDevice.user_id == user.id)).all()
     remove_user_access(radius_db, user.email)
     for device in devices:
+        # Remove the MAC entry too, or MAC login would let the device back on without a password.
+        remove_device_access(radius_db, device.mac_address)
         enqueue_disconnect(db, "account_disabled", now,
                            username=device_username(user.email, device.mac_address))
     user.is_active = False
@@ -139,6 +141,8 @@ def disconnect_account(db: Session, radius_db: Session, admin: User, user: User,
     devices = db.scalars(select(UserDevice).where(UserDevice.user_id == user.id)).all()
     for device in devices:
         close_device_sessions(radius_db, device.mac_address, now)
+        # Remove the MAC entry so the device must sign in again to get back on.
+        remove_device_access(radius_db, device.mac_address)
         enqueue_disconnect(db, "device_removed", now, mac=device.mac_address)
     record_admin_action(db, admin, "disconnect_account", user.id,
                         f"{user.email}: {len(devices)} device(s)", now)
@@ -158,6 +162,7 @@ def enable_account(db: Session, admin: User, user: User, now: datetime) -> None:
 def disconnect_device(db: Session, radius_db: Session, admin: User, device: UserDevice, now: datetime) -> None:
     """Cut the device off now. Its plan stays; it can reconnect after logging in."""
     close_device_sessions(radius_db, device.mac_address, now)
+    remove_device_access(radius_db, device.mac_address)
     enqueue_disconnect(db, "device_removed", now, mac=device.mac_address)
     record_admin_action(db, admin, "disconnect_device", device.user_id, device.mac_address, now)
     db.commit()
