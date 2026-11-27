@@ -31,6 +31,7 @@ from app.models import CoaQueue
 from app.radius_database import RadiusSessionLocal
 from app.services.coa import send_disconnect
 from app.services.radius import ACCOUNT_MATCH, account_match_params
+from app.utils.mac import normalise_mac
 from app.utils.time import utc_now
 
 log = logging.getLogger(__name__)
@@ -61,7 +62,8 @@ def open_sessions(radius_db: Session, row: CoaQueue) -> list[tuple[str, str]]:
                 "SELECT username, callingstationid FROM radacct "
                 "WHERE acctstoptime IS NULL AND callingstationid = :m"
             ),
-            {"m": row.mac_address},
+            # coa_queue stores the MAC with dashes; radacct stores Calling-Station-Id with colons.
+            {"m": normalise_mac(row.mac_address)},
         ).all()
     else:
         rows = radius_db.execute(

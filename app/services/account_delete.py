@@ -99,14 +99,27 @@ def reset_database(db: Session, radius_db: Session, admin: User, now: datetime) 
     ).all():
         grouped.setdefault(uid, []).append(mac)
 
+    # Every open session on the router, whoever it belongs to, must be disconnected. The CoA
+    # worker finds sessions in radacct, so open rows are kept until it has sent the disconnect.
+    open_macs = {
+        mac
+        for (mac,) in radius_db.execute(
+            text("SELECT DISTINCT callingstationid FROM radacct WHERE acctstoptime IS NULL")
+        ).all()
+        if mac
+    }
+    for mac in open_macs:
+        remove_device_access(radius_db, mac)
+        enqueue_disconnect(db, "device_removed", now, mac=mac)
+
     for user in users:
         macs = grouped.get(user.id, [])
         _clear_radius(radius_db, user.email, macs, now)
         enqueue_disconnect(db, "account_disabled", now, username=user.email)
-        # Accounting history for this account. FreeRADIUS writes radacct; clearing it here is
-        # part of the reset, not a routine change.
+        # Accounting history for this account. Only finished sessions are removed; open
+        # sessions stay so the CoA worker can disconnect them.
         radius_db.execute(
-            text(f"DELETE FROM radacct WHERE {ACCOUNT_MATCH}"),
+            text(f"DELETE FROM radacct WHERE {ACCOUNT_MATCH} AND acctstoptime IS NOT NULL"),
             account_match_params(user.email),
         )
     radius_db.commit()

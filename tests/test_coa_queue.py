@@ -92,4 +92,5 @@ def test_device_removed_finds_sessions_by_mac():
     coa_worker.open_sessions(radius, row)
     sql = str(radius.execute.call_args[0][0])
     assert "callingstationid = :m" in sql
-    assert radius.execute.call_args[0][1] == {"m": "A4-C3-F0-88-91-2E"}
+    # radacct stores Calling-Station-Id with colons, so the lookup must use colons.
+    assert radius.execute.call_args[0][1] == {"m": "A4:C3:F0:88:91:2E"}
